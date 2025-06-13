@@ -1,0 +1,5 @@
+knowledge/
+myenv/
+test/
+__pycache__/
+/environ.py
