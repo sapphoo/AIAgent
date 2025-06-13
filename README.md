@@ -25,4 +25,8 @@ myenv\Scripts\Activate
 ```
 pip list
 ```
+4. 跳出虚拟环境
+```
+deactivate
+```
 
