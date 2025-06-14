@@ -1,12 +1,7 @@
 
-import requests
-import json
 
-import os
 from openai import OpenAI
 import environ
-
-
 
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
