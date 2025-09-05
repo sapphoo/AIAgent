@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教务小助手 (MVP)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; background-color: #f8f9fa; }
+        h1, h2, h3 { color: #343a40; }
+        .card { background-color: #fff; border: 1px solid #dee2e6; border-radius: .25rem; padding: 20px; margin-bottom: 20px; }
+        #login-section, #info-display { display: block; }
+        #info-display.hidden { display: none; }
+        input { padding: 10px; width: calc(100% - 22px); margin-bottom: 10px; border: 1px solid #ced4da; border-radius: .25rem; }
+        button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: .25rem; }
+        button:hover { background-color: #0056b3; }
+        #login-error { color: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #e9ecef; }
+        #results { min-height: 50px; }
+    </style>
+</head>
+<body>
+
+    <h1>教务小助手 (第一阶段)</h1>
+
+    <!-- 登录区域 -->
+    <div id="login-section" class="card">
+        <h2>请登录</h2>
+        <input type="text" id="student-id" placeholder="请输入学号 (如: 2021001)">
+        <input type="password" id="password" placeholder="密码 (当前版本任意输入)">
+        <button onclick="login()">登录</button>
+        <p id="login-error"></p>
+    </div>
+
+    <!-- 信息展示区域 (登录后显示) -->
+    <div id="info-display" class="card hidden">
+        <h2 id="welcome-message"></h2>
+        <p>选择你要查询的信息：</p>
+        <button onclick="getScores()">查询我的成绩单</button>
+        <button onclick="getCredits()">查询已修学分</button>
+        <hr style="margin: 20px 0;">
+        <h3>查询结果:</h3>
+        <div id="results">请先选择一项进行查询。</div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:5000';
+        let currentStudent = null;
+
+        async function login() {
+            const studentId = document.getElementById('student-id').value.trim();
+            const password = document.getElementById('password').value;
+            const loginError = document.getElementById('login-error');
+            loginError.textContent = '';
+
+            if (!studentId) {
+                loginError.textContent = '学号不能为空！';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId, password: password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentStudent = data;
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('info-display').classList.remove('hidden');
+                    document.getElementById('welcome-message').textContent = `欢迎你, ${currentStudent.student_name} 同学!`;
+                    document.getElementById('results').innerHTML = '请选择一项进行查询。';
+                } else {
+                    loginError.textContent = `登录失败: ${data.error}`;
+                }
+            } catch (error) {
+                loginError.textContent = `请求失败，请确保后端服务已启动。`;
+            }
+        }
+
+        async function getScores() {
+            if (!currentStudent) return;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '正在查询成绩...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/students/${currentStudent.student_id}/scores`);
+                const scores = await response.json();
+                
+                if (scores.length === 0) {
+                    resultsDiv.innerHTML = '<p>暂无成绩记录。</p>';
+                    return;
+                }
+
+                let table = `<table><tr><th>课程名称</th><th>学期</th><th>学分</th><th>成绩</th></tr>`;
+                scores.forEach(s => {
+                    table += `<tr><td>${s.course_name}</td><td>${s.semester}</td><td>${s.credits}</td><td>${s.score}</td></tr>`;
+                });
+                table += '</table>';
+                resultsDiv.innerHTML = table;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color:red;">查询错误: ${error}</p>`;
+            }
+        }
+        
+        async function getCredits() {
+            if (!currentStudent) return;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '正在查询学分...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/students/${currentStudent.student_id}/credits_summary`);
+                const data = await response.json();
+                resultsDiv.innerHTML = `<h3>学分统计</h3><p>你当前已修满的学分为: <strong>${data.completed_credits}</strong> 分。</p><p>(只统计60分及以上的课程)</p>`;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color:red;">查询错误: ${error}</p>`;
+            }
+        }
+    </script>
+
+</body>
+</html>
