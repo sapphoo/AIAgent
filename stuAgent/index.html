@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+    <!-- ... (head部分和style样式代码与上一个版本完全相同，此处省略以节省空间) ... -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI教务助手</title>
@@ -122,9 +123,7 @@
 
     <div class="chat-container">
         <div class="chat-header">AI 教务助手</div>
-        <div id="chat-log" class="chat-log">
-            <!-- Messages will be added here by JavaScript -->
-        </div>
+        <div id="chat-log" class="chat-log"></div>
         <div class="chat-input-area">
             <input type="text" id="user-input" placeholder="输入你的问题...">
             <button id="send-button">发送</button>
@@ -138,21 +137,17 @@
 
         const API_BASE_URL = 'http://127.0.0.1:5000';
         
-        // 使用一个简单的状态机来管理登录流程
         let loginState = 'AWAITING_ID'; 
         let currentStudent = null;
 
-        // 在聊天记录中添加消息
         function addMessage(text, sender) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message', `${sender}-message`);
-            messageElement.innerHTML = text; // 使用innerHTML以支持表格等HTML内容
+            messageElement.innerHTML = text;
             chatLog.appendChild(messageElement);
-            // 自动滚动到底部
             chatLog.scrollTop = chatLog.scrollHeight;
         }
 
-        // 显示“正在输入”的动画
         function showTypingIndicator() {
             const typingElement = document.createElement('div');
             typingElement.classList.add('message', 'ai-message', 'typing-indicator');
@@ -162,15 +157,11 @@
             chatLog.scrollTop = chatLog.scrollHeight;
         }
 
-        // 移除“正在输入”的动画
         function removeTypingIndicator() {
             const typingElement = document.getElementById('typing-indicator');
-            if (typingElement) {
-                chatLog.removeChild(typingElement);
-            }
+            if (typingElement) chatLog.removeChild(typingElement);
         }
 
-        // 处理用户发送的消息
         async function handleSendMessage() {
             const userText = userInput.value.trim();
             if (!userText) return;
@@ -179,18 +170,15 @@
             userInput.value = '';
             showTypingIndicator();
 
-            // 模拟AI思考延迟
             setTimeout(async () => {
                 await processUserMessage(userText);
             }, 500);
         }
 
-        // "AI"核心逻辑：解析用户输入并调用相应功能
         async function processUserMessage(text) {
-            removeTypingIndicator(); // 收到回复，先移除"正在输入"
+            removeTypingIndicator();
 
             if (loginState === 'AWAITING_ID') {
-                // 尝试用用户的输入作为学号登录
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/login`, {
                         method: 'POST',
@@ -202,75 +190,34 @@
                     if (response.ok) {
                         currentStudent = data;
                         loginState = 'LOGGED_IN';
-                        addMessage(`你好，${currentStudent.student_name} 同学！很高兴为你服务。你可以问我关于“成绩”或“学分”的问题。`, 'ai');
+                        addMessage(`你好，${currentStudent.student_name} 同学！很高兴为你服务。你可以问我关于成绩、绩点或学分的问题。`, 'ai');
                     } else {
                         addMessage(`登录失败: ${data.error}。请输入正确的学号。`, 'ai');
                     }
                 } catch (error) {
-                    addMessage('连接后端服务失败，请确保服务已启动并检查CORS设置。', 'ai');
+                    addMessage('连接后端服务失败，请确保服务已启动。', 'ai');
                 }
-
             } else if (loginState === 'LOGGED_IN') {
-                // 将用户输入转为小写以便匹配
-                const lowerCaseText = text.toLowerCase();
-
-                if (lowerCaseText.includes('成绩') || lowerCaseText.includes('分数')) {
-                    await handleGetScores();
-                } else if (lowerCaseText.includes('学分')) {
-                    await handleGetCredits();
-                } else if (lowerCaseText.includes('退出') || lowerCaseText.includes('再见')) {
-                    loginState = 'AWAITING_ID';
-                    currentStudent = null;
-                    addMessage('你已退出登录。如需继续使用，请输入你的学号。', 'ai');
-                } else {
-                    addMessage('抱歉，我暂时无法理解你的问题。你可以试试问我：<br>- "我的成绩怎么样？"<br>- "我修了多少学分？"', 'ai');
+                // 将问题发送给后端的AI大脑处理
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/ai/process_query`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: text, student_id: currentStudent.student_id })
+                    });
+                    const data = await response.json();
+                    addMessage(data.answer, 'ai');
+                } catch (error) {
+                    addMessage('与AI助手通信时发生错误，请稍后再试。', 'ai');
                 }
-            }
-        }
-
-        // 调用API获取成绩并格式化输出
-        async function handleGetScores() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/students/${currentStudent.student_id}/scores`);
-                const scores = await response.json();
-                
-                if (scores.length === 0) {
-                    addMessage('你还没有任何成绩记录。', 'ai');
-                    return;
-                }
-
-                let table = `这是你的成绩单：<table><tr><th>课程名称</th><th>学期</th><th>学分</th><th>成绩</th></tr>`;
-                scores.forEach(s => {
-                    table += `<tr><td>${s.course_name}</td><td>${s.semester}</td><td>${s.credits}</td><td>${s.score}</td></tr>`;
-                });
-                table += '</table>';
-                addMessage(table, 'ai');
-            } catch (error) {
-                addMessage('查询成绩时发生错误，请稍后再试。', 'ai');
-            }
-        }
-
-        // 调用API获取学分并格式化输出
-        async function handleGetCredits() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/students/${currentStudent.student_id}/credits_summary`);
-                const data = await response.json();
-                const creditsMessage = `根据我的计算，你目前已完成 <strong>${data.completed_credits}</strong> 个学分（只统计及格课程）。`;
-                addMessage(creditsMessage, 'ai');
-            } catch (error) {
-                addMessage('查询学分时发生错误，请稍后再试。', 'ai');
             }
         }
         
-        // 事件监听
         sendButton.addEventListener('click', handleSendMessage);
-        userInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                handleSendMessage();
-            }
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') handleSendMessage();
         });
 
-        // 初始欢迎消息
         window.onload = () => {
             addMessage('你好！我是你的AI教务助手，请输入你的学号开始使用。', 'ai');
         };
