@@ -1,7 +1,10 @@
 import sqlite3
 from flask import Flask, jsonify, request
+from flask_cors import CORS  # 1. 导入CORS
 
 app = Flask(__name__)
+CORS(app)  # 2. 在创建app实例后，用CORS包装它
+
 DB_FILE = "school.db"
 
 def get_db_connection():
